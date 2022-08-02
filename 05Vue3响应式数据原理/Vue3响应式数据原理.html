@@ -1,0 +1,44 @@
+<!DOCTYPE html>
+<html lang="en">
+
+<head>
+  <meta charset="UTF-8">
+  <title>Vue3响应式数据原理</title>
+</head>
+
+<body>
+  <div>
+
+  </div>
+
+  <script type='text/javascript'>
+    // 模拟Vue3响应式数据
+    // 源数据
+    const data = { name: '张三', age: 18 }
+
+    //通过 Proxy（代理）: 拦截对象中任意属性的变化, 包括：属性值的读写、属性的添加、属性的删除等。
+    //语法
+    // const p = new Proxy(target, handler)
+    // 通过 Reflect（反射）: 对源对象的属性进行操作。这样可以避免反复使用try...catch
+    const person = new Proxy(data, {
+
+      // 拦截读取属性操作
+      get (target, property) {
+        // console.log(target, property) //target:源数据，property：访问的属性
+        return Reflect.get(target, property)
+      },
+      // 拦截新增和修改属性操作
+      set (target, property, value) {
+        // console.log(this) //this指向handler
+        console.log(`源数据的${property}属性被修改了，通知vue更新模板`)
+        return Reflect.set(target, property, value)
+      },
+      // 拦截删除属性操作
+      deleteProperty (target, property) {
+        return Reflect.deleteProperty(target, property)
+      }
+    })
+  </script>
+</body>
+
+</html>
