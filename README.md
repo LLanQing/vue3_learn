@@ -116,7 +116,7 @@ npm run dev
 
 ## 2.ref 函数
 
-- 作用: 定义一个响应式的数据
+- 作用: 	
 - 语法: `const xxx = ref(initValue)`
   - 创建一个包含响应式数据的<strong style="color:#DD5145">引用对象（reference 对象，简称 ref 对象）</strong>。
   - JS 中操作数据： `xxx.value`
