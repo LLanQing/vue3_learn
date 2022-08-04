@@ -99,6 +99,8 @@ npm run dev
 
 官方文档: https://v3.cn.vuejs.org/guide/composition-api-introduction.html
 
+将同一个逻辑关注点相关代码收集在一起
+
 ## 1.拉开序幕的 setup
 
 1. 理解：Vue3.0 中一个新的配置项，值为一个函数。
@@ -159,21 +161,31 @@ npm run dev
 - 实现原理:
 
   - 通过 Proxy（代理）: 拦截对象中任意属性的变化, 包括：属性值的读写、属性的添加、属性的删除等。
+  
+    ```js
+  //语法
+    const p = new Proxy(target, handler)
+    ```
+  ```
+  
+  
+  
   - 通过 Reflect（反射）: 对源对象的属性进行操作。
+  
   - MDN 文档中描述的 Proxy 与 Reflect：
-
+  
     - Proxy：https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Proxy
-
+  
     - Reflect：https://developer.mozilla.org/zh-CN/docs/Web/JavaScript/Reference/Global_Objects/Reflect
-
+  
       ```js
       new Proxy(data, {
       	// 拦截读取属性值
       	get(target, prop) {
       		return Reflect.get(target, prop);
       	},
-      	// 拦截设置属性值或添加新属性
-      	set(target, prop, value) {
+    	// 拦截设置属性值或添加新属性
+              set(target, prop, value) {
       		return Reflect.set(target, prop, value);
       	},
       	// 拦截删除属性
@@ -181,9 +193,9 @@ npm run dev
       		return Reflect.deleteProperty(target, prop);
       	},
       });
-
+  
       proxy.name = "tom";
-      ```
+  ```
 
 ## 5.reactive 对比 ref
 
@@ -205,11 +217,29 @@ npm run dev
   - 在 beforeCreate 之前执行一次，this 是 undefined。
 
 - setup 的参数
-  - props：值为对象，包含：组件外部传递过来，且组件内部声明接收了的属性。
+  - props：值为Proxy实例对象，包含：组件外部传递过来，且组件内部声明接收了的属性。
   - context：上下文对象
     - attrs: 值为对象，包含：组件外部传递过来，但没有在 props 配置中声明的属性, 相当于 `this.$attrs`。
+    
     - slots: 收到的插槽内容, 相当于 `this.$slots`。
+    
     - emit: 分发自定义事件的函数, 相当于 `this.$emit`。
+    
+      ```js
+      	// Attribute (非响应式对象，等同于 $attrs)
+          console.log(context.attrs)
+      
+          // 插槽 (非响应式对象，等同于 $slots)
+          console.log(context.slots)
+      
+          // 触发事件 (方法，等同于 $emit)
+          console.log(context.emit)
+      
+          // 暴露公共 property (函数)
+          console.log(context.expose)
+      ```
+    
+      
 
 ## 7.计算属性与监视
 
@@ -244,69 +274,89 @@ npm run dev
 
 ### 2.watch 函数
 
-- 与 Vue2.x 中 watch 配置功能一致
+`watch()` 默认是懒侦听的，即仅在侦听源发生变化时才执行回调函数。
 
-- 两个小“坑”：
+第一个参数是侦听器的**源**。这个来源可以是以下几种：
 
-  - 监视 reactive 定义的响应式数据时：oldValue 无法正确获取、强制开启了深度监视（deep 配置失效）。
-  - 监视 reactive 定义的响应式数据中某个属性时：deep 配置有效。
+- 一个函数，返回一个值
+- 一个 ref
+- 一个响应式对象
+- ...或是由以上类型的值组成的数组
 
-  ```js
-  //情况一：监视ref定义的响应式数据
-  watch(
-  	sum,
-  	(newValue, oldValue) => {
-  		console.log("sum变化了", newValue, oldValue);
-  	},
-  	{ immediate: true }
-  );
+第二个参数是在发生变化时要调用的回调函数。这个回调函数接受三个参数：新值、旧值，以及一个用于注册副作用清理的回调函数（第三个参数一般不用）
 
-  //情况二：监视多个ref定义的响应式数据
-  watch([sum, msg], (newValue, oldValue) => {
-  	console.log("sum或msg变化了", newValue, oldValue);
-  });
+第三个可选的参数是一个对象，支持以下这些选项：
 
-  /* 情况三：监视reactive定义的响应式数据
-  			若watch监视的是reactive定义的响应式数据，则无法正确获得oldValue！！
-  			若watch监视的是reactive定义的响应式数据，则强制开启了深度监视 
-  */
-  watch(
-  	person,
-  	(newValue, oldValue) => {
-  		console.log("person变化了", newValue, oldValue);
-  	},
-  	{ immediate: true, deep: false }
-  ); //此处的deep配置不再奏效
+- **`immediate`**：在侦听器创建时立即触发回调。第一次调用时旧值是 `undefined`。
+- **`deep`**：如果源是对象，强制深度遍历，以便在深层级变更时启动回调。参考[深层侦听器](https://staging-cn.vuejs.org/guide/essentials/watchers.html#deep-watchers)一节。
+- **`flush`**：调整回调函数的刷新时机。参考[回调的刷新时机](https://staging-cn.vuejs.org/guide/essentials/watchers.html#callback-flush-timing)一节。
+- **`onTrack / onTrigger`**：调试侦听器的依赖。参考[调试侦听器](https://staging-cn.vuejs.org/guide/extras/reactivity-in-depth.html#watcher-debugging)一节。
 
-  //情况四：监视reactive定义的响应式数据中的某个属性
-  watch(
-  	() => person.job,
-  	(newValue, oldValue) => {
-  		console.log("person的job变化了", newValue, oldValue);
-  	},
-  	{ immediate: true, deep: true }
-  );
 
-  //情况五：监视reactive定义的响应式数据中的某些属性
-  watch(
-  	[() => person.job, () => person.name],
-  	(newValue, oldValue) => {
-  		console.log("person的job变化了", newValue, oldValue);
-  	},
-  	{ immediate: true, deep: true }
-  );
 
-  //特殊情况
-  watch(
-  	() => person.job,
-  	(newValue, oldValue) => {
-  		console.log("person的job变化了", newValue, oldValue);
-  	},
-  	{ deep: true }
-  ); //此处由于监视的是reactive素定义的对象中的某个属性，所以deep配置有效
-  ```
+1. 与 Vue2.x 中 watch 配置功能一致
+2. 两个小“坑”：
+   - 监视 reactive 定义的响应式数据时：oldValue 无法正确获取、强制开启了深度监视（deep 配置失效）。
+   - 监视 reactive 定义的响应式数据中某个属性时：deep 配置有效。
+
+```js
+//情况一：监视ref定义的响应式数据
+watch(
+	sum,
+	(newValue, oldValue) => {
+		console.log("sum变化了", newValue, oldValue);
+	},
+	{ immediate: true }
+);
+
+//情况二：监视多个ref定义的响应式数据
+watch([sum, msg], (newValue, oldValue) => {
+	console.log("sum或msg变化了", newValue, oldValue);
+});
+
+/* 情况三：监视reactive定义的响应式数据
+			若watch监视的是reactive定义的响应式数据，则无法正确获得oldValue！！
+			若watch监视的是reactive定义的响应式数据，则强制开启了深度监视 
+*/
+watch(
+	person,
+	(newValue, oldValue) => {
+		console.log("person变化了", newValue, oldValue);
+	},
+	{ immediate: true, deep: false }
+); //此处的deep配置不再奏效
+
+//情况四：监视reactive定义的响应式数据中的某个属性
+watch(
+	() => person.job,
+	(newValue, oldValue) => {
+		console.log("person的job变化了", newValue, oldValue);
+	},
+	{ immediate: true, deep: true }
+);
+
+//情况五：监视reactive定义的响应式数据中的某些属性
+watch(
+	[() => person.job, () => person.name],
+	(newValue, oldValue) => {
+		console.log("person的job变化了", newValue, oldValue);
+	},
+	{ immediate: true, deep: true }
+);
+
+//特殊情况
+watch(
+	() => person.job,
+	(newValue, oldValue) => {
+		console.log("person的job变化了", newValue, oldValue);
+	},
+	{ deep: true }
+); //此处由于监视的是reactive素定义的对象中的某个属性，所以deep配置有效
+```
 
 ### 3.watchEffect 函数
+
+立即运行一个函数，同时响应式地追踪其依赖，并在依赖更改时重新执行。
 
 - watch 的套路是：既要指明监视的属性，也要指明监视的回调。
 
@@ -330,6 +380,56 @@ npm run dev
 
 <div style="border:1px solid black;width:380px;float:left;margin-right:20px;"><strong>vue2.x的生命周期</strong><img src="https://cn.vuejs.org/images/lifecycle.png" alt="lifecycle_2" style="zoom:33%;width:1200px" /></div><div style="border:1px solid black;width:510px;height:985px;float:left"><strong>vue3.0的生命周期</strong><img src="https://v3.cn.vuejs.org/images/lifecycle.svg" alt="lifecycle_2" style="zoom:33%;width:2500px" /></div>
 
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
+
 1
 
 - Vue3.0 中可以继续使用 Vue2.x 中的生命周期钩子，但有有两个被更名：
@@ -345,7 +445,7 @@ npm run dev
   - `beforeUnmount` ==>`onBeforeUnmount`
   - `unmounted` =====>`onUnmounted`
 
-## 9.自定义 hook 函数
+## 9.组合式函数hook 
 
 - 什么是 hook？—— 本质是一个函数，把 setup 函数中使用的 Composition API 进行了封装。
 
@@ -355,7 +455,7 @@ npm run dev
 
 ## 10.toRef
 
-- 作用：创建一个 ref 对象，其 value 值指向另一个对象中的某个属性。
+- 作用：可用于为响应式对象上的 property 创建 ref。这样创建的 ref 与其源 property 保持同步：改变源 property 将更新 ref，反之亦然。
 - 语法：`const name = toRef(person,'name')`
 - 应用: 要将响应式对象中的某个属性单独提供给外部使用时。
 
@@ -374,14 +474,14 @@ npm run dev
 
 ## 2.readonly 与 shallowReadonly
 
-- readonly: 让一个响应式数据变为只读的（深只读）。
-- shallowReadonly：让一个响应式数据变为只读的（浅只读）。
+- readonly: 接受一个对象 (不论是响应式还是一般的) 或是一个 [ref](https://staging-cn.vuejs.org/api/reactivity-core.html#ref)，返回一个原值的只读代理。只读代理是深层的：对任何嵌套 	property 的访问都将是只读的。它的 ref 解包行为与 `reactive()` 相同，但解包得到的值是只读的。
+- shallowReadonly：让一个对象变为只读的（浅只读）。
 - 应用场景: 不希望数据(尤其是这个数据是来自与其他组件时)被修改时。
 
 ## 3.toRaw 与 markRaw
 
 - toRaw：
-  - 作用：将一个由`reactive`生成的<strong style="color:orange">响应式对象</strong>转为<strong style="color:orange">普通对象</strong>。
+  - 作用：将一个由`reactive、shallowReactive、readonly、shallowReadonly`生成的<strong style="color:orange">响应式对象（Proxy对象）</strong>转为<strong style="color:orange">原始对象</strong>。 
   - 使用场景：用于读取响应式对象对应的普通对象，对这个普通对象的所有操作，不会引起页面更新。
 - markRaw：
   - 作用：标记一个对象，使其永远不会再成为响应式对象。
@@ -392,6 +492,10 @@ npm run dev
 ## 4.customRef
 
 - 作用：创建一个自定义的 ref，并对其依赖项跟踪和更新触发进行显式控制。
+
+- customRef() 预期接收一个工厂函数作为参数，这个工厂函数接受 track 和 trigger 两个函数作为参数，并返回一个带有 get 和 set 方法的对象。
+
+- 一般来说，track() 应该在 get() 方法中调用，而 trigger() 应该在 set() 中调用。然而事实上，你对何时调用、是否应该调用他们有完全的控制权。 
 
 - 实现防抖效果：
 
@@ -499,6 +603,12 @@ npm run dev
 
 
 
+
+
+
+
+
+
 ## 2.Composition API 的优势
 
 我们可以更加优雅的组织我们的代码，函数。让相关功能的代码更加有序的组织在一起。
@@ -509,6 +619,14 @@ npm run dev
 <div style="width:430px;height:340px;overflow:hidden;float:left">
     <img src="https://p9-juejin.byteimg.com/tos-cn-i-k3u1fbpfcp/6cc55165c0e34069a75fe36f8712eb80~tplv-k3u1fbpfcp-watermark.image"style="height:360px"/>
 </div>
+
+
+
+
+
+
+
+
 
 
 
